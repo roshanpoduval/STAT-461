@@ -1,0 +1,105 @@
+---
+title: "Stat 461 HW3"
+author: "Roshan Poduval"
+date: "10/12/2020"
+output: html_document
+---
+
+## Question 3e
+```{r}
+n = 10
+tau = 1
+r = .06
+S0 = 100
+u = 1.1
+d = 0.9
+K = 110
+
+q = (exp(r) - d)/(u - d)
+
+expectation = 0
+for (j in 1:n) {
+  price = max(((S0*(u^j)*(d^(n-j))) - K),0)
+  probability = choose(n,j)*(q^j)*((1-q)^(n-j))
+  expectation = expectation + (price*probability)
+}
+
+C0 = exp(-r*n*tau)*expectation
+C0
+```
+
+## Question 6
+```{r}
+set.seed(1234)
+mu = .06
+sigma = 0.1
+T = 1
+S0 = 60
+n = 10000
+N = 500
+dt = T/n
+t = seq(0, T, by=dt)
+
+R = mu*dt + sigma*rnorm(n*N, mean=0, sd=sqrt(dt))
+R = matrix(R, n, N)
+
+S = matrix(rep(0, n*N), n, N)
+S = rbind(rep(S0, N), S)
+for (j in 1:N) {
+  for (i in 1:n) {
+    S[i+1,j] = S[i,j]*R[i,j] + S[i,j]
+  }
+}
+sum(S[10001,]>68)/N
+paste("95% Confidence Interval for stock price after 1 year: [", qnorm(.025)*sd(S[10001,])+mean(S[10001,]), ",", qnorm(.975)*sd(S[10001,])+mean(S[10001,]), "] centered around", mean(S[10001,]))
+```
+
+## Question 7
+```{r}
+d1 <- function(S0, K, r, sigma, T) {
+  return(log(S0/K) + ((r + ((sigma^2)/2))*T))/(sigma*sqrt(T))
+}
+d2 <- function(S0, K, r, sigma, T) {
+  return(d1(S0, K, r, sigma, T) - (sigma*sqrt(T)))
+}
+C0 <- function(S0, K, r, sigma, T) {
+  return((S0*dnorm(d1(S0, K, r, sigma, T))) - (K*exp(-r*T)*dnorm(d2(S0, K, r, sigma, T))))
+}
+P0 <- function(S0, K, r, sigma, T) {
+  return((K*exp(-r*T)*dnorm(-d2(S0, K, r, sigma, T))) - (S0*dnorm(-d1(S0, K, r, sigma, T))))
+}
+
+S0 = 60
+K = 68
+r = .06
+sigma = .1
+T = 1
+paste("7a) Call:", C0(S0, K, r, sigma, T), "Put:", P0(S0, K, r, sigma, T))
+
+S0 = 60
+K = 50:80
+r = .06
+sigma = .1
+T = 1
+fpremium = C0(S0, K, r, sigma, T)
+plot(K, fpremium, main="7b) Fair Premium ~ Strike Price")
+paste("7b) As the strike price of the call goes up (the price we are allowed to buy the stock at if the call option is exercised), the fair premium (price we are willing to pay) goes up. This makes sense because a call that allows you to buy at a lower price later has more value.")
+
+S0 = 60
+K = 68
+r = seq(.01, .1, .01)
+sigma = .1
+T = 1
+fpremium = C0(S0, K, r, sigma, T)
+plot(r, fpremium, main="7c) Fair Premium ~ Interest Rate")
+paste("7c) As interest rate increases, the fair premium of the call also increases. This makes sense because if the (risk-free) interest rate is high, that means that stock price will likely also grow relatively fast. If the stock price is going to grow, then it makes sense to buy a call that secures a low price in the future for you to buy at. Conversely, if the interest rate is low, it is likely that the stock price will not grow as much (compared to when interest rate is high). If the stock isn't going to get much more expensive to buy, there is less incentive to buy a call option that sets a price for you to buy at in the future (likely the call option will not be exercised).")
+
+S0 = 60
+K = 68
+r = .06
+sigma = seq(.1, .3, .01)
+T = 1
+fpremium = C0(S0, K, r, sigma, T)
+plot(sigma, fpremium, main="7d) Fair Premium ~ Volatility")
+paste("7d) As volitility increases, the fair premium increases. If the price of a stock is more volatile, then it makes sense to want to set a price you can buy the stock at later by purchasing a call (more demand = higher price). If the price of a stock is not very volatile, then there is not much need for a call option because it is easier to get a more reliable estimate for the stock price in the futur.")
+```

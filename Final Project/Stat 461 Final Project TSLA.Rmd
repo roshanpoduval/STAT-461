@@ -1,0 +1,126 @@
+---
+title: "Stat 461 Final Project TSLA"
+author: "Roshan Poduval"
+date: "12/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(1234)
+
+
+#devtools::install_github('wrengels/HWxtest', subdir='pkg') # for basicStats (only once)
+library(diveRsity) # for basicStats (maybe more)
+library(rugarch)
+library(quantmod)
+library(moments)
+
+
+setwd("~/Schoolwork/STAT 461/Final Project")
+```
+
+```{r}
+tsla_price = read.table("TSLA.csv", sep=",", header=TRUE)
+tsla_price = tsla_price$Adj.Close
+plot(tsla_price, type='l', ylab="tsla adj close price", main="Plot of (start) 6/30/2010 - 12/05/2020 daily TSLA stock price")
+```
+```{r}
+tsla_return = diff(log(tsla_price)) # daily log returns
+plot(tsla_return, type="o", main="Plot of (start) 6/30/2010 - 12/05/2020 daily TSLA stock returns")
+```
+
+```{r}
+par(mfrow=c(1,2))
+acf(tsla_return, main="acf tsla_return")
+pacf(tsla_return, main="pacf tsla_return")
+```
+
+```{r}
+mean(tsla_return)
+sd(tsla_return)
+skewness(tsla_return)
+kurtosis(tsla_return)
+```
+
+```{r}
+t.test(tsla_return, mu=0, alternative="two.sided")
+Box.test(tsla_return, lag=20, type="Ljung-Box")
+```
+
+```{r}
+#testing_ma = 5
+#aic = matrix(rep(0, testing_ma), testing_ma, 1)
+#bic = matrix(rep(0, testing_ma), testing_ma, 1)
+#for (i in 1:testing_ma) {
+#  m = arima(tsla_return, order=c(0,0,i))
+#  aic[i,1] = AIC(m)
+#  bic[i,1] = BIC(m)
+#}
+#which(aic== min(aic), arr.ind = TRUE) # [1, 1] {ARIMA(0,0,1)}
+#which(bic== min(bic), arr.ind = TRUE) # [1, 1] {ARIMA(0,0,1)}
+```
+
+```{r}
+par(mfrow=c(1,2))
+acf(tsla_return^2, main="acf tsla_return^2")
+pacf(tsla_return^2, main="pacf tsla_return^2")
+```
+
+```{r}
+ma = 1
+spec1 = ugarchspec(
+  mean.model = list(armaOrder = c(0,ma)),
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  distribution.model = "norm")
+m1 = ugarchfit(tsla_return, spec=spec1)
+m1
+plot(m1, which=9)
+```
+
+```{r}
+spec2 = ugarchspec(
+  mean.model = list(armaOrder = c(0,ma)),
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  distribution.model = "sstd")
+m2 = ugarchfit(tsla_return, spec=spec2)
+m2
+plot(m2, which="all")
+plot(m2, which=9)
+```
+
+This model sucks worse than above sGARCH because of the results of Ljung-Box test (p-values)
+```{r}
+spec3 = ugarchspec(
+  mean.model = list(armaOrder = c(0,ma)),
+  variance.model = list(model = "eGARCH", garchOrder = c(1,1)),
+  distribution.model = "sstd")
+m3 = ugarchfit(tsla_return, spec=spec3)
+m3
+plot(m3, which=12)
+plot(m3, which="all")
+#par(mfrow=c(1,2))
+#plot(m3, which=10)
+plot(m3, which=11)
+```
+
+Tried eGARCH(2,1) because saw correlation in ACF plot of standardized residuals squared at lag 2.
+This looks better based on results of Ljung-Box test (p-values) and BIC.
+```{r}
+spec4 = ugarchspec(
+  mean.model = list(armaOrder = c(0,ma)),
+  variance.model = list(model = "eGARCH", garchOrder = c(2,1)),
+  distribution.model = "sstd")
+m4 = ugarchfit(tsla_return, spec=spec4)
+m4
+plot(m4, which=12)
+plot(m4, which="all")
+#par(mfrow=c(1,2))
+#plot(m4, which=10)
+plot(m4, which=11)
+```
+
+```{r}
+uncmean(m4)
+uncvariance(m4)
+```

@@ -1,0 +1,62 @@
+---
+title: "Stat 461 HW4"
+author: "Roshan Poduval"
+date: "11/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 3b
+```{r}
+set.seed(1234)
+T = 1000
+N = 10000
+Y = matrix(, nrow=1000, ncol=N/T)
+for (i in 1:(N/T)) {
+  Y[,i] = arima.sim(model=list(ar=c(0.8)), n=T)
+}
+print(acf(Y[,1], lag=5, main="", plot=FALSE)[c(1,5)])
+```
+
+```{r}
+my_acfs = matrix(, nrow=2, ncol=N/T)
+for (i in 1:(N/T)) {
+  my_acfs[1,i] = acf(Y[,i], lag=5, main="", plot=FALSE)[1]$acf
+  my_acfs[2,i] = acf(Y[,i], lag=5, main="", plot=FALSE)[5]$acf
+}
+```
+
+## 3e
+```{r}
+acf1 = my_acfs[1,]
+acf2 = my_acfs[2,]
+par(mfrow=c(2,1))
+plot(density(acf1), main="acf1")
+plot(density(acf2), main="acf5")
+paste("acf1; mean:", mean(acf1), "sd:", sd(acf1))
+paste("acf5; mean:", mean(acf2), "sd:", sd(acf2))
+```
+
+## 4e
+```{r}
+ten_predict_error <- function(a110, a109, a108) {
+  return(a110 - (.3 * a109) + (.12 * a108))
+}
+
+n_samples = 1000
+
+a110 = rt(n_samples, 4)
+a109 = rt(n_samples, 4)
+a108 = rt(n_samples, 4)
+
+predictions = ten_predict_error(a110, a109, a108)
+
+a = mean(predictions)
+s = sd(predictions)
+
+error = qnorm(.975)*s/sqrt(n_samples)
+paste0("95% C.I. of 10-step ahead prediction error(n=", n_samples,"): (", a-error, ", ", a+error, ")")
+```

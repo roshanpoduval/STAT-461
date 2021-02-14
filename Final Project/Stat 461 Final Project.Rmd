@@ -1,0 +1,138 @@
+---
+title: "Stat 461 Final Project"
+author: "Roshan Poduval"
+date: "12/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(1234)
+
+
+#devtools::install_github('wrengels/HWxtest', subdir='pkg') # for basicStats (only once)
+library(diveRsity) # for basicStats (maybe more)
+library(rugarch)
+library(quantmod)
+library(moments)
+
+
+setwd("~/Schoolwork/STAT 461/Final Project")
+```
+
+```{r}
+amd_price = read.table("AMD.csv", sep=",", header=TRUE)
+amd_price = amd_price$Adj.Close
+plot(amd_price, type='l', ylab="amd adj close price", main="Plot of 12/05/2000 - 12/05/2020 daily AMD stock price")
+```
+
+```{r}
+amd_return = diff(log(amd_price)) # daily log returns
+plot(amd_return, type="o", main="Plot of 12/05/2000 - 12/05/2020 daily AMD stock returns")
+```
+
+```{r}
+par(mfrow=c(1,2))
+acf(amd_return, main="acf amd_return")
+pacf(amd_return, main="pacf amd_return")
+```
+From the acf and pacf plots of the AMD log returns, it looks like there is some correlation in the lags of the non-squared term.
+
+```{r}
+mean(amd_return)
+sd(amd_return)
+skewness(amd_return)
+kurtosis(amd_return)
+```
+
+I will perform a two-sided t-test to check if the mean of the AMD log returns is different from 0.
+```{r}
+t.test(amd_return, mu=0, alternative="two.sided")
+Box.test(amd_return, lag=20, type="Ljung-Box")
+```
+The mean of the returns does not appear to be significantly different from 0 (no need for MA model), and there appears to be some correlation in the lags of the non-squared term (seen in the acf and pacf plots and by performing the Ljung-Box test on the AMD log returns). This tells me that I might want to consider employing an AR model.
+
+I will be checking AIC and BIC to determine how many lags I should use for the AR model.
+```{r}
+#testing_ar = 20
+#aic = matrix(rep(0, testing_ar), testing_ar, 1)
+#bic = matrix(rep(0, testing_ar), testing_ar, 1)
+#for (i in 1:testing_ar) {
+#  m = arima(amd_return, order=c(i,0,0))
+#  aic[i,1] = AIC(m)
+#  bic[i,1] = BIC(m)
+#}
+#which(aic== min(aic), arr.ind = TRUE) # [7, 1] {ARIMA(7,0,0)}
+#which(bic== min(bic), arr.ind = TRUE) # [1, 1] {ARIMA(1,0,0)}
+```
+Checking for minimum BIC tells us that we should use ARIMA(1,0,0), and AIC tells us that we should use ARIMA(7,0,0).
+Since by looking at the pacf plot of AMD log returns, it seems like there is correlation up to 7 lags, I will be using the results of checking AIC.
+Given this information, the ARIMA model I will be using is ARIMA(7,0,0).
+
+```{r}
+ar = 7
+ar_model = arima(amd_return, order=c(ar,0,0))
+ar_model
+Box.test(ar_model$residuals, lag=20, fitdf=ar, type="Ljung-Box")
+```
+The results of the Ljung-Box test on the AR model's residuals indicates that the AR model has effectively modeled the serial correlation in the non-squared term.
+
+```{r}
+par(mfrow=c(1,2))
+acf(ar_model$residuals^2, main="acf residuals^2")
+pacf(ar_model$residuals^2, main="pacf residuals^2")
+Box.test(ar_model$residuals^2, lag=20, fitdf=ar, type="Ljung-Box")
+```
+The results of the Ljung-Box test on the AR model's squared residuals indicates that we should apply a GARCH model to the log returns, as there is still correlation among the squared terms.
+
+```{r}
+spec1 = ugarchspec(
+  mean.model = list(armaOrder = c(ar,0)),
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  distribution.model = "norm")
+m1 = ugarchfit(amd_return, spec=spec1)
+m1
+```
+
+```{r}
+plot(m1, which=9)
+```
+If we look at the norm - QQ Plot, we can see that we need to pick a distribution for our model with much heavier tails.
+I will try the "sstd", or Skewed Student t-Distribution.
+
+```{r}
+spec2 = ugarchspec(
+  mean.model = list(armaOrder = c(ar,0)),
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  distribution.model = "sstd")
+m2 = ugarchfit(amd_return, spec=spec2)
+m2
+#coef(m2)
+```
+We can see (above shape & skew p-value) that the t-distribution is being used (not approximating normal-dist with t-dist).
+We can also see (below norm - QQ Plot) that using the t-dist is effective.
+```{r}
+plot(m2, which="all")
+```
+
+We know that it is common for stock volitility to be affected more from negative returns than positive returns.
+This is called 'leverage effect'.
+The sGARCH model I have been using does not capture leverage effects, so to try to capture this, I will try using the eGARCH, or exponential GARCH.
+```{r}
+spec3 = ugarchspec(
+  mean.model = list(armaOrder = c(ar,0)),
+  variance.model = list(model = "eGARCH", garchOrder = c(1,1)),
+  distribution.model = "sstd")
+m3 = ugarchfit(amd_return, spec=spec3)
+m3
+plot(m3, which=12)
+plot(m3, which="all")
+par(mfrow=c(1,2))
+plot(m3, which=10)
+plot(m3, which=11)
+```
+
+```{r}
+uncmean(m3)
+uncvariance(m3)
+```

@@ -1,0 +1,85 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+## Problem 5
+```{r}
+x = c(300, 350, 400, 400, 450, 450, 480, 480, 530, 530,  580,  580,  620,  620,  670,  700)
+y = c(5.8, 4.5, 5.9, 6.2, 6.0, 7.5, 6.1, 8.6, 8.9, 8.2, 14.2, 11.9, 11.1, 11.5, 14.5, 14.8)
+x_trimmed = c(350, 400, 400, 450, 450, 480, 480, 530, 530,  580,  620,  620,  670,  700)
+y_trimmed = c(4.5, 5.9, 6.2, 6.0, 7.5, 6.1, 8.6, 8.9, 8.2, 11.9, 11.1, 11.5, 14.5, 14.8)
+
+plot(x, y, main="Problem 5a/b")
+xylm = lm(y ~ x)
+abline(xylm)
+xylm
+anova(xylm)
+summary(xylm)
+par(mfrow = c(2,2))
+plot(xylm)
+```
+
+It appears that as x increases, so does y.
+The line of best fit found by simple linear regression seems to agree.
+Intercept = -4.79841
+Slope = 0.02733
+y = 0.02733x - 4.79841
+
+## Problem 6
+
+```{r}
+require(quantmod)
+require(moments)
+require(symmetry)
+require(ICS)
+sp500 = new.env()
+getSymbols("^GSPC",from="2017-1-1", to="2020-9-2", env=sp500, src="yahoo")
+GSPC = sp500$GSPC$GSPC.Adjusted
+chartSeries(GSPC$GSPC.Adjusted, theme="white")
+mean(GSPC)
+sd(GSPC)
+GSPC_skew = (sum((GSPC - mean(GSPC))^3)/nrow(GSPC))/((sum((GSPC - mean(GSPC))^2)/nrow(GSPC))^(3/2))
+GSPC_skew
+GSPC_kurt = (sum((GSPC - mean(GSPC))^4)/nrow(GSPC))/((sum((GSPC - mean(GSPC))^2)/nrow(GSPC))^(2))
+GSPC_kurt
+min(GSPC)
+max(GSPC)
+GSPC_density = density(GSPC)
+plot(GSPC_density, main="Simple return density plot")
+qqnorm(GSPC, main="Simple return Normal Q-Q Plot")
+fBasics::normalTest(as.vector(GSPC), method="jb")
+
+logGSPC = diff(log(GSPC$GSPC.Adjusted))[-1,]
+mean(logGSPC)
+sd(logGSPC)
+logGSPC_skew = (sum((logGSPC - mean(logGSPC))^3)/nrow(logGSPC))/((sum((logGSPC - mean(logGSPC))^2)/nrow(logGSPC))^(3/2))
+logGSPC_skew
+logGSPC_kurt = (sum((logGSPC - mean(logGSPC))^4)/nrow(logGSPC))/((sum((logGSPC - mean(logGSPC))^2)/nrow(logGSPC))^(2))
+logGSPC_kurt
+min(logGSPC)
+max(logGSPC)
+t.test(as.vector(logGSPC), mu=0)
+S = skewness(logGSPC)/sqrt(6/length(logGSPC))
+2*pnorm(-abs(S))
+K = kurtosis(logGSPC)/sqrt(24/length(logGSPC))
+2*pnorm(-abs(K))
+```
+
+## Problem 7
+```{r}
+getFX("USD/CNY", from="2020-4-01", to="2020-9-2")
+logUSDCNY = diff(log(USDCNY$USD.CNY))[-1,]
+mean(logUSDCNY)
+sd(logUSDCNY)
+logUSDCNY_skew = (sum((logUSDCNY - mean(logUSDCNY))^3)/nrow(logUSDCNY))/((sum((logUSDCNY - mean(logUSDCNY))^2)/nrow(logUSDCNY))^(3/2))
+logUSDCNY_skew
+logUSDCNY_kurt = (sum((logUSDCNY - mean(logUSDCNY))^4)/nrow(logUSDCNY))/((sum((logUSDCNY - mean(logUSDCNY))^2)/nrow(logUSDCNY))^(2))
+logUSDCNY_kurt
+min(logUSDCNY)
+max(logUSDCNY)
+logUSDCNY_density = density(logUSDCNY)
+plot(logUSDCNY_density, main="log USDCNY density plot")
+t.test(as.vector(logUSDCNY), mu=0)
+fBasics::normalTest(as.vector(logUSDCNY), method="jb")
+qqnorm(logUSDCNY, main="log USDCNY Normal Q-Q Plot")
+```

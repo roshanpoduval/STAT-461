@@ -1,0 +1,134 @@
+---
+title: "Stat 461 HW2"
+author: "Roshan Poduval"
+date: "9/30/2020"
+output: html_document
+---
+
+1. Question 1
+  + $E[e^x] = \int_{-\infty}^{\infty} e^x * \frac{1}{.5\sqrt{2\pi}} * e^{-\frac{1}{2}(\frac{x-.8}{.5})^2} dx \approx 2.52$
+  
+    $Var(e^x) = \int_{-\infty}^{\infty} (e^x)^2 * \frac{1}{.5\sqrt{2\pi}} * e^{-\frac{1}{2}(\frac{x-.8}{.5})^2} dx \approx 8.17 - (2.52)^2 = 1.82$
+```{r}
+set.seed(123)
+x = rnorm(500, mean=.8, sd=.05)
+cat("Mean for sample of simple net returns is", mean(exp(x)), "\n")
+cat("Variance for sample of simple net retruns is", sd(exp(x)), "\n")
+
+par(mfrow=c(1,2))
+plot(density(x), main = "log returns")#hist(x, main="log returns", col="red")
+plot(density(exp(x)), main = "simple net returns")#hist(exp(x), main="simple returns", col = "blue")
+```
+  + The plot of log returns is much less spread out compared to the simple returns. They both look normally distributed.
+  
+2. Question 2
+  + $P(p_{20}>16)=P(sum(r_t) > 4)\approx0.3446$ where $sum(r_t)$~$_{iid}N(.1*20, .5^2*20)=N(2, \sqrt{5}^2)$
+```{r}
+set.seed(123)
+p0 = 12
+T = 20
+sim=500
+rt = rnorm(T*sim, mean=.1, sd=.5)
+dim(rt) = c(T, sim) # change rt into a T*sim matrix layout
+pt = p0 + apply(rt, 2, cumsum) # compute cumulative sums for each column (dimension 2)
+
+x = 1:T
+plot(x, pt[,1], xlab="Time", ylab="Random Walk Price", type='l', ylim=c(7,20))
+for (i in 2:sim) {
+  lines(x, pt[,i], col=i)
+}
+cat("The number of walks with a final price > 16 is", sum(pt[20,]>16), "\n")
+cat("Or", sum(pt[20,]>16)/sim, "%", "\n")
+```
+  + The number of terminal values from all 500 simulated walks that were greater than 16 was 88. This is about half as many as I would expect based on my answer to part a.
+  
+3. Question 3
+```{r}
+set.seed(1234)
+mu = .2
+sig = .5
+T = 1
+S0 = 100
+n = 10000
+dt = T/n
+t = seq(0, T, by=dt)
+R = mu*dt + sig*rnorm(n, mean=0, sd=sqrt(dt))
+S = c(S0, rep(0,n))
+#S = S0 + cumsum(R)
+for (i in 1:n) {
+  S[i+1] = S[i]*R[i] + S[i]
+}
+plot(t, S, type="l", xlab="time")
+lines(t, c(S0*exp(mu*t)), col="red") #abline(lm(S~c(1:10000)))
+```
+```{r}
+set.seed(123)
+mu = .2
+sig = .5
+sim = 500
+T = 1
+S0 = 100
+n = 10000
+dt = T/n
+t = seq(0, T, by=dt)
+R = mu*dt + sig*rnorm(n*sim, mean=0, sd=sqrt(dt))
+dim(R) = c(n, sim)
+S = matrix(rep(0, (n+1)*sim), n+1, sim)
+S[1,] = rep(S0, sim)
+for (j in 1:sim) {
+  for (i in 1:n) {
+    S[i+1,j] = S[i,j]*R[i,j]+S[i,j]
+  }
+}
+cat("There are", sum(S[(.8/dt),]>120), "simulated values for S at time 0.8 that are greater than 120\n")
+pnorm(log(120/100), mean=0.06, sd=sqrt(0.2), lower.tail = F)
+```
+  + $\Delta W_t$~$_{iid}N(0,\Delta t)$
+  
+    $\Delta t = .0001$
+    
+    $\sum_1^{8000}{\Delta W_t}$~$N(0*1000,\sqrt{\Delta t *8000}^2=N(0,\sqrt{.8}^2)$
+    
+    $S_{.8}=100+.2*\Delta t*8000+.5\sum_1^{8000}\Delta W_t=100.16+.5\sum_1^{8000}\Delta W_t$
+    
+    $.5\sum_1^{8000}\Delta W_t$~$N(0, \sqrt{.5^2*.8}^2)$
+    
+    $S_{.8}$~$N(100.16, \sqrt{.5^2*.8}^2)$
+    
+    $P(S_{.8}>120)$ is very small for the above theoretical distribution. For some reason 188/500 (37.6% of simulated values at time 0.8) were above 120.
+
+4. Question 4
+```{r}
+x = seq(0,4000)/100.00
+premium = 100
+p0 = 20
+y = integer(0)
+payoff = integer(0)
+for (price in x) {
+  payoff = append(payoff, max(c((price*100 - p0*100), 0)))
+}
+y = payoff - (exp(0.12/4)*premium)
+plot(x, payoff, type="n", lty=1, lwd=1, col="blue", ylim=c(-200,400))
+lines(x, replicate(length(x), 0))
+lines(x, payoff, lty=2, lwd=1, col="blue")
+lines(x, (y-p0), lty=2, lwd=1, col="red")
+text(6, 350, labels="payoff", col="blue")
+text(6, 300, labels="profit", col="red")
+```
+```{r}
+x = seq(0,4000)/100.00
+premium = 100
+p0 = 20
+y = integer(0)
+payoff = integer(0)
+for (price in x) {
+  payoff = append(payoff, max(c((exp(-0.12/4)*(p0*100 - price*100)), 0)))
+}
+y = payoff - premium
+plot(x, payoff, type="n", lty=1, lwd=1, col="blue", ylim=c(-200,400))
+lines(x, replicate(length(x), 0))
+lines(x, payoff, lty=2, lwd=1, col="blue")
+lines(x, (y-p0), lty=2, lwd=1, col="red")
+text(6, 350, labels="payoff", col="blue")
+text(6, 300, labels="profit", col="red")
+```

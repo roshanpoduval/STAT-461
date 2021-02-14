@@ -1,0 +1,85 @@
+---
+title: "Stat 461 HW5"
+author: "Roshan Poduval"
+date: "12/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(quantmod)
+library(rugarch)
+library(ggpubr)
+```
+
+```{r}
+#getSymbols("AAPL",from="2010-07-31",to="2020-07-31") # this won't work for me, so I am just going to download the csv from yahoo for the correct date range
+AAPL = read.table("AAPL.csv", sep=",", header=TRUE)
+adj_price = AAPL$Adj.Close
+log_rt = diff(log(adj_price))
+```
+
+```{r}
+mean(log_rt)
+t.test(log_rt, mu=0, alternative="two.sided")
+```
+2a) It appears that the expected value of $r_t$ is different from 0, so we should implement MA in our model.
+
+```{r}
+acf(log_rt)
+pacf(log_rt)
+
+## This section takes a long time to run, so I have commented it out and written the important results down
+#lags = 10
+#aic_m = matrix(0, nrow=lags, ncol=lags)
+#bic_m = matrix(0, nrow=lags, ncol=lags)
+
+#for (i in 1:lags) {
+#  for (j in 1:lags) {
+#    aic_m[i,j] = AIC(arima(log_rt, order=c((i-1),0,(j-1))))
+#    bic_m[i,j] = BIC(arima(log_rt, order=c((i-1),0,(j-1))))
+#  }
+#}
+#which(aic_m==min(aic_m), arr.ind=TRUE) # [10, 7]
+#which(bic_m==min(bic_m), arr.ind=TRUE) # [6, 3]
+```
+
+2b) There appears to be some serial correlation (and the mean of returns is not 0). The AIC tells me that I should use ARMA(9,6), but the BIC suggests to use ARMA(5,2), which is simpler. So I will use ARMA(5,2).
+
+```{r}
+ar = 5
+ma = 2
+m1 = arima(log_rt, c(ar,0,ma))
+m1
+Box.test(m1$residuals^2, lag=8, fitdf=7, type="Ljung-Box")
+```
+2c) The result of the Ljung-Box test tells us that we reject $H_0: \rho_1 = \rho_2 = ...... = \rho_8 = 0$, so there appears to still be correlation with the squared term.
+
+```{r}
+# using arma(0,0) per TA's recommendation
+garch_spec_norm = ugarchspec(
+  mean.model = list(armaOrder = c(0,0)),
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  distribution.model = "norm")
+m2 = ugarchfit(log_rt, spec=garch_spec_norm)
+plot(m2, which=9)
+```
+2d) No, the model is not adequate. We can see from the norm-QQ Plot that the tails of the normal distribution are not heavy enough.
+
+```{r}
+garch_spec_std = ugarchspec(
+  mean.model = list(armaOrder = c(0,0)),
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  distribution.model = "std")
+m3 = ugarchfit(log_rt, spec=garch_spec_std)
+plot(m3, which="all")
+```
+2e) It looks like this model is adequate. The QQ Plot looks good, and the ACF plots of the standardized residuals and squared standardized residuals seem to indicate that the model has fit the data relatively well.
+
+```{r}
+plot(as.numeric(sigma(m3)), main="", type="o", ylab="volatility", cex=0.5)
+```
+
+```{r}
+forecast = ugarchforecast(m3, n.ahead = 5)
+forecast
+```
